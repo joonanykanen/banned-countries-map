@@ -109,22 +109,36 @@
       // Create bannedData with keys matching the ISO3 codes (uppercase) from Python.
       const bannedData = {};
       {% for country, count, percentage in country_data %}
-      {
-        let fillKey = "LOW";
-        if ({{ count }} > 50) {
-          fillKey = "HIGH";
-        } else if ({{ count }} > 20) {
-          fillKey = "MEDIUM";
-        }
-        bannedData["{{ country }}"] = {
-          count: {{ count }},
-          fillKey: fillKey
-        };
-      }
+      bannedData["{{ country }}"] = { count: {{ count }} };
       {% endfor %}
+
+      // Dynamically assign a fillKey using the range of banned IP counts.
+      // Collect all counts.
+      const counts = Object.keys(bannedData).map(function(key) {
+        return bannedData[key].count;
+      });
+
+      // Determine maximum value (guard against empty arrays).
+      const maxCount = counts.length ? Math.max(...counts) : 0;
+
+      // Assign fillKey for each country based on its count relative to maxCount.
+      // For example: HIGH if >= 66% of max, MEDIUM if >= 33% of max, otherwise LOW.
+      Object.keys(bannedData).forEach(function(key) {
+        let count = bannedData[key].count;
+        let fillKey;
+        if (maxCount > 0 && count >= maxCount * 0.66) {
+          fillKey = "HIGH";
+        } else if (maxCount > 0 && count >= maxCount * 0.33) {
+          fillKey = "MEDIUM";
+        } else {
+          fillKey = "LOW";
+        }
+        bannedData[key].fillKey = fillKey;
+      });
 
       console.log("Banned Data:", bannedData);
 
+      // Define color mappings for each level.
       const fills = {
         HIGH: "#800026",
         MEDIUM: "#FD8D3C",
