@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Banned Countries Map</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f9f9f9;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+      }
+      /* Make the map-container a positioned element */
+      #map-container {
+        position: relative;
+        width: 100%;
+        height: 500px;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        /* Prevent text selection during drag */
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        text-align: left;
+      }
+      th {
+        background-color: #f1f1f1;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      /* Zoom controls positioned relative to map-container */
+      #zoom-controls {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        z-index: 10;
+      }
+      #zoom-controls button {
+        background-color: #fff;
+        border: 1px solid #ccc;
+        padding: 8px;
+        margin: 2px 0;
+        font-size: 16px;
+        cursor: pointer;
+        width: 40px;
+        height: 40px;
+        border-radius: 4px;
+        box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2);
+      }
+      #zoom-controls button:hover {
+        background-color: #eee;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>IP Origin Statistics</h1>
+
+    <!-- Map container: zoom-controls is now inside map-container -->
+    <div id="map-container">
+      <!-- Zoom Controls -->
+      <div id="zoom-controls">
+        <button id="zoom-in">+</button>
+        <button id="zoom-out">–</button>
+      </div>
+    </div>
+
+    <!-- Table showing raw banned IP data -->
+    <table>
+      <thead>
+        <tr>
+          <th>Country (ISO3)</th>
+          <th>Occurrences</th>
+          <th>Percentage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for country, count, percentage in country_data %}
+        <tr>
+          <td>{{ country }}</td>
+          <td>{{ count }}</td>
+          <td>{{ percentage | round(2) }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Include JavaScript dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.9/topojson.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/datamaps/0.5.1/datamaps.world.min.js"></script>
+
+    <script>
+      // Create bannedData with keys matching the ISO3 codes (uppercase) from Python.
+      const bannedData = {};
+      {% for country, count, percentage in country_data %}
+      {
+        let fillKey = "LOW";
+        if ({{ count }} > 50) {
+          fillKey = "HIGH";
+        } else if ({{ count }} > 20) {
+          fillKey = "MEDIUM";
+        }
+        bannedData["{{ country }}"] = {
+          count: {{ count }},
+          fillKey: fillKey
+        };
+      }
+      {% endfor %}
+
+      console.log("Banned Data:", bannedData);
+
+      const fills = {
+        HIGH: "#800026",
+        MEDIUM: "#FD8D3C",
+        LOW: "#FED976",
+        defaultFill: "#DDD"
+      };
+
+      // Create the Datamap.
+      const map = new Datamap({
+        element: document.getElementById("map-container"),
+        projection: "mercator",
+        fills: fills,
+        data: bannedData,
+        geographyConfig: {
+          highlightFillColor: "#FC8D59",
+          popupTemplate: function(geo, data) {
+            return '<div class="hoverinfo"><strong>' +
+                   geo.properties.name +
+                   '</strong><br>Banned IPs: ' +
+                   (data && data.count ? data.count : 0) +
+                   '</div>';
+          }
+        }
+      });
+
+      // Define a variable to hold the current zoom state.
+      let currentTransform = {translate: [0, 0], scale: 1};
+
+      // Attach D3 zoom behavior to the map's SVG.
+      setTimeout(() => {
+        // Select the SVG element in the map container.
+        const svg = d3.select("#map-container").select("svg");
+        // The main group that holds the map graphics.
+        const mapGroup = svg.select("g");
+        // Get the dimensions of the container to help compute the center.
+        const containerElem = document.getElementById("map-container");
+        const containerWidth = containerElem.offsetWidth;
+        const containerHeight = containerElem.offsetHeight;
+        // Compute the center coordinates.
+        const center = [containerWidth / 2, containerHeight / 2];
+
+        // Create the zoom behavior.
+        const zoom = d3.behavior.zoom()
+                       .scaleExtent([0.5, 8])
+                       // Set the center so that mouse zoom events are about the middle.
+                       .center(center)
+                       .on("zoom", () => {
+                         // For manual mouse interactions, use event's translate.
+                         currentTransform = {translate: d3.event.translate, scale: d3.event.scale};
+                         mapGroup.attr("transform", "translate(" + currentTransform.translate + ") scale(" + currentTransform.scale + ")");
+                       });
+
+        // Apply the zoom behavior to the SVG element.
+        svg.call(zoom);
+
+        // Function to update zoom by setting a new scale level while centering via the container’s center.
+        const updateZoom = (newScale) => {
+          // Clamp the scale between the defined min and max.
+          newScale = Math.max(0.5, Math.min(8, newScale));
+          currentTransform.scale = newScale;
+          // Recalculate the translation so that the zoom stays centered.
+          // This formula ensures that when scale = 1, translation is [0, 0], and when zoomed in/out it shifts accordingly.
+          currentTransform.translate = [
+            center[0] - center[0] * newScale,
+            center[1] - center[1] * newScale
+          ];
+          // Smoothly transition the transformation.
+          mapGroup.transition().duration(350)
+                  .attr("transform", "translate(" + currentTransform.translate + ") scale(" + currentTransform.scale + ")");
+          // Update the zoom behavior's current state so that subsequent user interactions are in sync.
+          zoom.scale(newScale).translate(currentTransform.translate);
+        };
+
+        // Bind zoom in/out buttons.
+        d3.select("#zoom-in").on("click", () => {
+          updateZoom(currentTransform.scale * 1.2);
+        });
+
+        d3.select("#zoom-out").on("click", () => {
+          updateZoom(currentTransform.scale / 1.2);
+        });
+
+      }, 500);
+    </script>
+  </body>
+</html>
