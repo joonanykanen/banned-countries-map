@@ -5,7 +5,7 @@ A Flask-based web application that visualizes the geographic origins of banned I
 ![Web UI Screenshot](screenshot.png)
 
 > [!IMPORTANT]  
-> This project has been tested only on Python 3.10.12 and Ubuntu 22.04.5 LTS.  
+> This project has been tested only on Python 3.10.12 and Ubuntu 22.04.5 LTS.
 
 ## Features
 
@@ -20,7 +20,7 @@ Before running the app on Ubuntu 22.04 (or similar), ensure you have:
 - Python 3.10.12 (or greater if you want to try out your luck)
 - UFW enabled and configured to log and reject unwanted connections.
 - **geoip-bin** installed for `geoiplookup` to work. For Ubuntu, install it via apt:
-  
+
   ```bash
   $ sudo apt install geoip-bin
   ```
@@ -46,11 +46,10 @@ Before running the app on Ubuntu 22.04 (or similar), ensure you have:
 
    ```bash
    $ python3 -m venv venv
-   source venv/bin/activate
+   $ source venv/bin/activate
    ```
 
-4. **Install the rest dependencies:**
-
+4. **Install the required dependencies:**
    ```bash
    $ pip install -r requirements.txt
    ```
@@ -59,11 +58,12 @@ Before running the app on Ubuntu 22.04 (or similar), ensure you have:
 
 1. **Ensure geoip-bin is installed**  
    You can test this by running:
-   >$ which geoiplookup
 
-    And it should return the full path to geoiplookup. E.g.:
+   > $ which geoiplookup
 
-   > /usr/bin/geoiplookup  
+   And it should return the full path to geoiplookup. E.g.:
+
+   > /usr/bin/geoiplookup
 
 2. **Start the Flask app:**
 
@@ -71,35 +71,37 @@ Before running the app on Ubuntu 22.04 (or similar), ensure you have:
    python app.py
    ```
 
-3. **Enter your sudo password when prompted:**  
+3. **Enter your sudo password when prompted:**
+
    When the application initializes, it may ask for `sudo` privileges to run `ufw status`. This might look like:
 
-   (venv) joona@test-instance:~/banned-countries-map$ python app.py  
-   * Serving Flask app 'app'  
-   * Debug mode: on  
-   WARNING: This is a development server. Do not use it in a production deployment.  
-   * Running on http://127.0.0.1:5000  
-   Press CTRL+C to quit  
-   * Restarting with stat  
-   * Debugger is active!  
-   * Debugger PIN: 800-638-335  
-   [sudo] password for joona:  
+   ```
+   (venv) joona@test-instance:~/banned-countries-map$ python app.py
+   * Serving Flask app 'app'
+   * Debug mode: on
+   WARNING: This is a development server. Do not use it in a production deployment.
+   * Running on http://127.0.0.1:5000
+   Press CTRL+C to quit
+   * Restarting with stat
+   * Debugger is active!
+   * Debugger PIN: 800-638-335
+   [sudo] password for joona:
+   ```
 
    Simply type your password and hit Enter to continue.
 
-4. **Open your web browser** and navigate to:  
+4. **Open your web browser** and navigate to:
    [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
-Hurray! You should see the Web UI with an interactive map and a table of banned IP statistics.
-
+   Hurray! You should see the Web UI with an interactive map and a table of banned IP statistics.
 
 ## Notes & Tips
 
 - The JavaScript libraries (D3, TopoJSON, Datamaps) used for the front-end view are loaded via CDN. It is possible that there comes a day these will get deprecated and removed.
-- You can adjust the zoom thresholds in the JavaScript code if needed to better represent your data. E.g. from `d3.behavior.zoom().scaleExtent([0.5, 8])` to `d3.behavior.zoom().scaleExtent([0.25, 20])`.
+- You can adjust the zoom thresholds in the JavaScript code if needed to better represent your dataset. For example, change `d3.behavior.zoom().scaleExtent([0.5, 8])` to something like `d3.behavior.zoom().scaleExtent([0.25, 20])`.
 
 > [!TIP]
-> If you don't get any IPs, be sure to check that the banned IPs are labeled as "REJECT" when running `fail2ban-client status`. If they are something else, you can modify `app.py` accordingly. Otherwise, be happy since there are allegedly no diligent intruders trying to get into your system!
+> If you don't see any IPs, be sure to check that the banned IPs show up as "REJECT" when running `fail2ban-client status` or that the appropriate jails in F2BJAILS (app.py) are populated. If they appear differently, you may need to adjust the parsing logic in `app.py`. Otherwise, be happy since there are allegedly no diligent intruders trying to get into your system!
 
 ## License
 
