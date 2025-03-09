@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 import subprocess
+import ast
 import pycountry
 from flask import Flask, render_template
 
 app = Flask(__name__)
+
+# In case ufw status doesn't find any banned IPs.
+F2BJAILS = ["sshd"]
 
 
 # Given an IP, return the two-letter country code from geoiplookup.
@@ -34,8 +38,9 @@ def alpha3(country_code):
         return country_code.upper()
 
 
-# Process ufw status, get IP addresses, and map them to ISO3 country codes.
+# Process ufw status (or fail2ban as fallback), get IP addresses, and map them to ISO3 country codes.
 def get_ip_origin_with_flags():
+    # First, try to get IPs from "ufw status" (looking for lines with "REJECT")
     result = subprocess.run(["sudo", "ufw", "status"], stdout=subprocess.PIPE)
     ufw_output = result.stdout.decode("utf-8")
 
@@ -43,6 +48,25 @@ def get_ip_origin_with_flags():
     ip_addresses = [
         line.split()[2] for line in ufw_output.splitlines() if "REJECT" in line
     ]
+
+    # If no banned IPs were found with ufw, try fail2ban for each jail in F2BJAILS
+    if not ip_addresses:
+        for jail in F2BJAILS:
+            fail2ban_result = subprocess.run(
+                ["sudo", "fail2ban-client", "get", jail, "banned"],
+                stdout=subprocess.PIPE,
+            )
+            fail2ban_output = fail2ban_result.stdout.decode("utf-8").strip()
+            # The output is something like:
+            # ['103.101.160.198', '103.116.177.252', ...]
+            try:
+                jail_ips = ast.literal_eval(fail2ban_output)
+                # If parsing doesn't return a list, make sure we get an empty list.
+                if not isinstance(jail_ips, list):
+                    jail_ips = []
+            except Exception:
+                jail_ips = []
+            ip_addresses += jail_ips
 
     country_count = {}
     for ip in ip_addresses:
